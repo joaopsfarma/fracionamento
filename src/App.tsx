@@ -575,7 +575,24 @@ export default function App() {
       try {
         const docSnap = await getDoc(doc(db, 'config', 'medicamentos_base'));
         if (docSnap.exists()) {
-          setCsvData(JSON.parse(docSnap.data().data));
+          const docData = docSnap.data();
+          const parsedStr = docData.data;
+          if (parsedStr) {
+            const parsed = JSON.parse(parsedStr);
+            if (docData.isOptimized) {
+               // convert back to objects
+               const converted = parsed.map((arr: string[]) => ({
+                  Produto: arr[0] || '',
+                  Identificacao: arr[1] || '',
+                  Lote: arr[2] || '',
+                  Validade: arr[3] || '',
+                  Fabricante: arr[4] || ''
+               }));
+               setCsvData(converted);
+            } else {
+               setCsvData(parsed);
+            }
+          }
         }
         const empSnap = await getDoc(doc(db, 'config', 'funcionarios'));
         if (empSnap.exists() && empSnap.data().lista) {
@@ -661,8 +678,10 @@ export default function App() {
         
         setCsvData(parsedData);
         try {
-          await setDoc(doc(db, 'config', 'medicamentos_base'), { data: JSON.stringify(parsedData) });
-          alert(`Foram importados ${parsedData.length} registros (lotes) com sucesso!`);
+          // Optimize JSON structure to save space (array of arrays instead of objects with keys)
+          const optimizedData = parsedData.map(d => [d.Produto, d.Identificacao, d.Lote, d.Validade, d.Fabricante]);
+          await setDoc(doc(db, 'config', 'medicamentos_base'), { data: JSON.stringify(optimizedData), isOptimized: true });
+          alert(`Foram importados ${parsedData.length} registros (lotes) com sucesso! Eles já ficarão salvos para as próximas visitas.`);
         } catch (e: any) {
           console.error("Erro ao salvar base no Firebase:", e);
           alert("Erro ao salvar no Firebase: " + e.message);
