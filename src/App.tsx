@@ -738,9 +738,13 @@ export default function App() {
         </div>
 
         {forms.map((form, index) => {
-          const applicableLots = csvData
+          const applicableLots = Array.from(new Set(csvData
             .filter(d => d.Identificacao === form.identificacao && d.Lote)
-            .map(d => d.Lote);
+            .map(d => d.Lote)));
+
+          const filteredMeds = form.identificacao 
+            ? uniqueMedications.filter(m => m.toLowerCase().includes(form.identificacao.toLowerCase())).slice(0, 100)
+            : uniqueMedications.slice(0, 100);
 
           return (
             <div key={form.id} className="relative bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 transition-all print:p-6 print:print-card">
@@ -774,7 +778,7 @@ export default function App() {
                       placeholder="Selecione ou digite o nome completo"
                     />
                     <datalist id={`meds-${form.id}`}>
-                      {uniqueMedications.map((med, idx) => (
+                      {filteredMeds.map((med, idx) => (
                         <option key={idx} value={med} />
                       ))}
                     </datalist>
@@ -792,19 +796,21 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-5">
-                  <TextInput 
-                    label="Lote" 
-                    icon={BarcodeIcon} 
-                    value={form.lote}
-                    onChange={(e: any) => updateForm(form.id, 'lote', e.target.value)}
-                    list={`lots-${form.id}`}
-                    placeholder="Lote do frasco"
-                  />
-                  <datalist id={`lots-${form.id}`}>
-                    {Array.from(new Set(applicableLots)).map((lote, idx) => (
-                      <option key={idx} value={lote} />
-                    ))}
-                  </datalist>
+                  <div>
+                    <TextInput 
+                      label="Lote" 
+                      icon={BarcodeIcon} 
+                      value={form.lote}
+                      onChange={(e: any) => updateForm(form.id, 'lote', e.target.value)}
+                      list={`lots-${form.id}`}
+                      placeholder="Lote do frasco"
+                    />
+                    <datalist id={`lots-${form.id}`}>
+                      {applicableLots.map((lote, idx) => (
+                        <option key={idx} value={lote} />
+                      ))}
+                    </datalist>
+                  </div>
                   <div>
                     <TextInput 
                       label="Fabricante" 
