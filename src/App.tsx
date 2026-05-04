@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 
 interface FractionationRecord {
   id: string;
@@ -55,23 +55,22 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const [validationImage, setValidationImage] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchRecords = async () => {
-      try {
-        const q = collection(db, 'fracionamentos');
-        // We will just fetch all and filter client side since we don't have complex indexes set up
-        const snapshot = await getDocs(q);
-        const fetchedRecords: FractionationRecord[] = [];
-        snapshot.forEach(docSnap => {
-          fetchedRecords.push({ id: docSnap.id, ...docSnap.data() } as FractionationRecord);
-        });
-        setRecords(fetchedRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRecords();
+    setLoading(true);
+    const q = collection(db, 'fracionamentos');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedRecords: FractionationRecord[] = [];
+      snapshot.forEach(docSnap => {
+        fetchedRecords.push({ id: docSnap.id, ...docSnap.data() } as FractionationRecord);
+      });
+      setRecords(fetchedRecords.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis()));
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
+      handleFirestoreError(err, OperationType.LIST, 'fracionamentos');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const startValidation = (id: string) => {
@@ -639,48 +638,53 @@ export default function App() {
   }
 
   useEffect(() => {
-    const fetchBase = async () => {
-      try {
-        const docSnap = await getDoc(doc(db, 'config', 'medicamentos_base'));
-        if (docSnap.exists()) {
-          const docData = docSnap.data();
-          const parsedStr = docData.data;
-          if (parsedStr) {
-            const parsed = JSON.parse(parsedStr);
-            if (docData.isOptimized) {
-               // convert back to objects
-               const converted = parsed.map((arr: string[]) => ({
-                  Produto: arr[0] || '',
-                  Identificacao: arr[1] || '',
-                  Lote: arr[2] || '',
-                  Validade: arr[3] || '',
-                  Fabricante: arr[4] || ''
-               }));
-               setCsvData(converted);
-            } else {
-               setCsvData(parsed);
-            }
+    const unsubBase = onSnapshot(doc(db, 'config', 'medicamentos_base'), (docSnap) => {
+      if (docSnap.exists()) {
+        const docData = docSnap.data();
+        const parsedStr = docData.data;
+        if (parsedStr) {
+          const parsed = JSON.parse(parsedStr);
+          if (docData.isOptimized) {
+             const converted = parsed.map((arr: string[]) => ({
+                Produto: arr[0] || '',
+                Identificacao: arr[1] || '',
+                Lote: arr[2] || '',
+                Validade: arr[3] || '',
+                Fabricante: arr[4] || ''
+             }));
+             setCsvData(converted);
+          } else {
+             setCsvData(parsed);
           }
         }
-        const empSnap = await getDoc(doc(db, 'config', 'funcionarios'));
-        if (empSnap.exists() && empSnap.data().lista) {
-          setEmployees(empSnap.data().lista);
-        }
-        const mfgSnap = await getDoc(doc(db, 'config', 'fabricantes'));
-        if (mfgSnap.exists() && mfgSnap.data().lista) {
-          setManufacturers(mfgSnap.data().lista);
-        } // if not exists, we just rely on MANUFACTURERS default which is already the initial state
-      } catch (e: any) {
-        console.error("Error loading base from Firebase", e);
-        if (e.message && e.message.includes('offline')) {
-          setDbError('Erro de conexão com o Banco de Dados (Offline). Isso geralmente acontece se a sua API Key no "Google Cloud Console" possui restrições que bloqueiam a URL deste site, ou se falta permissão para a API do Cloud Firestore.');
-        } else {
-          setDbError('Erro ao carregar dados do banco: ' + (e.message || 'Erro desconhecido.'));
-        }
       }
+    }, (e) => {
+      console.error("Error loading base from Firebase", e);
+      if (e.message && e.message.includes('offline')) {
+        setDbError('Erro de conexão com o Banco de Dados (Offline). Isso geralmente acontece se a sua API Key no "Google Cloud Console" possui restrições que bloqueiam a URL deste site, ou se falta permissão para a API do Cloud Firestore.');
+      } else {
+        setDbError('Erro ao carregar dados do banco: ' + (e.message || 'Erro desconhecido.'));
+      }
+    });
+
+    const unsubEmp = onSnapshot(doc(db, 'config', 'funcionarios'), (empSnap) => {
+      if (empSnap.exists() && empSnap.data().lista) {
+        setEmployees(empSnap.data().lista);
+      }
+    }, (e) => console.error("Error loading employees", e));
+
+    const unsubMfg = onSnapshot(doc(db, 'config', 'fabricantes'), (mfgSnap) => {
+      if (mfgSnap.exists() && mfgSnap.data().lista) {
+        setManufacturers(mfgSnap.data().lista);
+      }
+    }, (e) => console.error("Error loading manufacturers", e));
+
+    return () => {
+      unsubBase();
+      unsubEmp();
+      unsubMfg();
     };
-    fetchBase();
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
