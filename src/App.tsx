@@ -3,7 +3,7 @@ import Papa from 'papaparse';
 import { 
   Settings, FileUp, Check, Plus, Trash2, Printer, X, 
   Pill, Hash, Factory, Calendar, ShieldAlert, ArrowRightLeft, 
-  User, Beaker, ThermometerSnowflake, FileSignature, Box, Tag, Package, Camera, CloudUpload, LogIn, LogOut
+  User, Beaker, ThermometerSnowflake, FileSignature, Box, Tag, Package, Camera, CloudUpload, LogIn, LogOut, AlertCircle
 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
@@ -350,7 +350,12 @@ function AuthModal({ onClose }: { onClose: () => void }) {
       await signInAnonymously(auth);
       onClose();
     } catch (err: any) {
-      setError(err.message || 'Erro ao entrar como anônimo');
+      console.error(err);
+      if (err.code === 'auth/admin-restricted-operation') {
+        setError('Erro de permissão da API Key. Vá ao Google Cloud Console -> APIs & Services -> Credentials e verifique se a sua API Key (Firebase) tem restrições de site/referrer que estão bloqueando este domínio, ou se a API "Identity Toolkit API" está permitida.');
+      } else {
+        setError(err.message || 'Erro ao entrar como anônimo');
+      }
     } finally {
       setLoading(false);
     }
@@ -541,6 +546,7 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   
   const [forms, setForms] = useState<FractionationForm[]>([createEmptyForm()]);
+  const [dbError, setDbError] = useState('');
 
   function createEmptyForm(): FractionationForm {
     return {
@@ -575,8 +581,13 @@ export default function App() {
         if (empSnap.exists() && empSnap.data().lista) {
           setEmployees(empSnap.data().lista);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("Error loading base from Firebase", e);
+        if (e.message && e.message.includes('offline')) {
+          setDbError('Erro de conexão com o Banco de Dados (Offline). Isso geralmente acontece se a sua API Key no "Google Cloud Console" possui restrições que bloqueiam a URL deste site, ou se falta permissão para a API do Cloud Firestore.');
+        } else {
+          setDbError('Erro ao carregar dados do banco: ' + (e.message || 'Erro desconhecido.'));
+        }
       }
     };
     fetchBase();
@@ -854,6 +865,13 @@ export default function App() {
       {/* Main Content */}
       <main className="p-4 sm:p-8 max-w-5xl mx-auto print:mx-0 print:p-0 print:max-w-none space-y-8">
         
+        {dbError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-start gap-3">
+            <AlertCircle className="shrink-0 mt-0.5" size={20} />
+            <div className="font-medium text-sm leading-relaxed">{dbError}</div>
+          </div>
+        )}
+
         {/* Print Header */}
         <div className="hidden print:flex mb-8 items-stretch border border-gray-400 rounded-2xl overflow-hidden shadow-sm">
           <div className="w-1/3 bg-gray-50 flex flex-col items-center justify-center p-6 border-r border-gray-400">
