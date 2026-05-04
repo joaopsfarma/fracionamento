@@ -674,7 +674,7 @@ export default function App() {
       }
     };
     fetchBase();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
