@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 interface FractionationRecord {
   id: string;
@@ -467,14 +467,17 @@ export default function App() {
   }
 
   useEffect(() => {
-    const saved = localStorage.getItem('medicine_csv_data');
-    if (saved) {
+    const fetchBase = async () => {
       try {
-        setCsvData(JSON.parse(saved));
+        const docSnap = await getDoc(doc(db, 'config', 'medicamentos_base'));
+        if (docSnap.exists()) {
+          setCsvData(JSON.parse(docSnap.data().data));
+        }
       } catch (e) {
-        console.error(e);
+        console.error("Error loading base from Firebase", e);
       }
-    }
+    };
+    fetchBase();
   }, []);
 
   useEffect(() => {
@@ -495,7 +498,7 @@ export default function App() {
     Papa.parse(file, {
       header: false,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         const data = results.data as string[][];
         if (data.length === 0) return;
         
@@ -543,19 +546,29 @@ export default function App() {
         }
         
         setCsvData(parsedData);
-        localStorage.setItem('medicine_csv_data', JSON.stringify(parsedData));
+        try {
+          await setDoc(doc(db, 'config', 'medicamentos_base'), { data: JSON.stringify(parsedData) });
+          alert(`Foram importados ${parsedData.length} registros (lotes) com sucesso!`);
+        } catch (e: any) {
+          console.error("Erro ao salvar base no Firebase:", e);
+          alert("Erro ao salvar no Firebase: " + e.message);
+        }
         setShowSettings(false);
-        alert(`Foram importados ${parsedData.length} registros (lotes) com sucesso!`);
       }
     });
 
     e.target.value = '';
   };
 
-  const handleClearData = () => {
+  const handleClearData = async () => {
     if(confirm('Tem certeza que deseja limpar os dados importados?')) {
       setCsvData([]);
-      localStorage.removeItem('medicine_csv_data');
+      try {
+        await deleteDoc(doc(db, 'config', 'medicamentos_base'));
+      } catch (e: any) {
+        console.error("Erro ao apagar base no Firebase:", e);
+        alert("Erro ao apagar base no Firebase: " + e.message);
+      }
     }
   };
 
@@ -665,22 +678,24 @@ export default function App() {
             >
               <Printer size={16} /> <span className="hidden sm:inline">Imprimir</span>
             </button>
-            <button 
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-xs sm:text-sm font-bold shadow-sm"
-            >
-              <Settings size={16} /> <span className="hidden sm:inline">Base </span>{csvData.length > 0 && `(${csvData.length})`}
-            </button>
             
             {user ? (
               <>
                 {user.email === 'joaopsfarma@gmail.com' && (
-                  <button 
-                    onClick={() => setShowValidationDashboard(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all text-xs sm:text-sm font-bold shadow-sm"
-                  >
-                    <Check size={16} /> <span className="hidden lg:inline">Validar Registros</span>
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => setShowSettings(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-xs sm:text-sm font-bold shadow-sm"
+                    >
+                      <Settings size={16} /> <span className="hidden sm:inline">Base </span>{csvData.length > 0 && `(${csvData.length})`}
+                    </button>
+                    <button 
+                      onClick={() => setShowValidationDashboard(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all text-xs sm:text-sm font-bold shadow-sm"
+                    >
+                      <Check size={16} /> <span className="hidden lg:inline">Validar Registros</span>
+                    </button>
+                  </>
                 )}
                 <button 
                   onClick={logout}
