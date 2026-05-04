@@ -301,8 +301,6 @@ const MANUFACTURERS = [
   "Viatris", "Vitamedic", "Wyeth", "Zambon", "Zodiac", "Zydus"
 ];
 
-const EMPLOYEES = ["Ana Beatriz", "Eloísa", "Gabriela"];
-
 function AuthModal({ onClose }: { onClose: () => void }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -434,10 +432,81 @@ function AuthModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+function LandingPage({ onLogin }: { onLogin: () => void }) {
+  return (
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans">
+      <nav className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm sticky top-0 z-30">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-indigo-600 rounded-xl shadow-inner">
+            <Box size={24} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight leading-tight">Fracionamento Digital</h1>
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Controle Hospitalar</p>
+          </div>
+        </div>
+        <button 
+          onClick={onLogin}
+          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-sm font-bold shadow-md"
+        >
+          <LogIn size={18} /> 
+          <span className="hidden sm:inline">Acessar o Sistema</span>
+        </button>
+      </nav>
+
+      <main className="flex-1 flex flex-col items-center justify-center p-8 text-center max-w-4xl mx-auto">
+        <div className="w-24 h-24 bg-indigo-100 rounded-3xl flex items-center justify-center mb-8 shadow-sm">
+          <Box size={48} className="text-indigo-600" />
+        </div>
+        <h2 className="text-4xl md:text-6xl font-black text-slate-900 tracking-tight leading-tight mb-6">
+          Gestão Inteligente de <span className="text-indigo-600">Fracionamento</span>
+        </h2>
+        <p className="text-lg md:text-xl text-slate-600 font-medium max-w-2xl mx-auto mb-12">
+          O sistema definitivo para controle hospitalar. Registre, valide e acompanhe o fracionamento de medicamentos com segurança, rastreabilidade e simplicidade.
+        </p>
+        <button 
+          onClick={onLogin}
+          className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 transition-all text-lg font-bold shadow-xl hover:shadow-indigo-500/30 hover:-translate-y-1"
+        >
+          <LogIn size={24} /> 
+          <span>Fazer Login para Começar</span>
+        </button>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-24 text-left w-full">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+            <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center text-teal-600">
+              <ShieldAlert size={24} />
+            </div>
+            <h3 className="font-bold text-slate-900 text-lg">Segurança Total</h3>
+            <p className="text-slate-500 text-sm font-medium">Controle rigoroso de lotes e validades para garantir a segurança do paciente.</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+              <Check size={24} />
+            </div>
+            <h3 className="font-bold text-slate-900 text-lg">Validação Integrada</h3>
+            <p className="text-slate-500 text-sm font-medium">Sistema de validação dupla com assinatura de farmacêuticos responsáveis.</p>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
+            <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center text-rose-600">
+              <Camera size={24} />
+            </div>
+            <h3 className="font-bold text-slate-900 text-lg">Registro Fotográfico</h3>
+            <p className="text-slate-500 text-sm font-medium">Armazenamento de imagens da etiqueta primária para auditoria e conferência.</p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [csvData, setCsvData] = useState<MedicineRow[]>([]);
+  const [employees, setEmployees] = useState<string[]>(["Ana Beatriz", "Eloísa", "Gabriela"]);
+  const [newEmployee, setNewEmployee] = useState('');
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [showValidationDashboard, setShowValidationDashboard] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -473,6 +542,10 @@ export default function App() {
         if (docSnap.exists()) {
           setCsvData(JSON.parse(docSnap.data().data));
         }
+        const empSnap = await getDoc(doc(db, 'config', 'funcionarios'));
+        if (empSnap.exists() && empSnap.data().lista) {
+          setEmployees(empSnap.data().lista);
+        }
       } catch (e) {
         console.error("Error loading base from Firebase", e);
       }
@@ -483,6 +556,7 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setAuthInitialized(true);
     });
     return () => unsubscribe();
   }, []);
@@ -568,6 +642,30 @@ export default function App() {
       } catch (e: any) {
         console.error("Erro ao apagar base no Firebase:", e);
         alert("Erro ao apagar base no Firebase: " + e.message);
+      }
+    }
+  };
+
+  const handleAddEmployee = async () => {
+    if (!newEmployee.trim()) return;
+    const updated = [...employees, newEmployee.trim()];
+    setEmployees(updated);
+    setNewEmployee('');
+    try {
+      await setDoc(doc(db, 'config', 'funcionarios'), { lista: updated });
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const handleRemoveEmployee = async (emp: string) => {
+    if(confirm(`Remover ${emp}?`)) {
+      const updated = employees.filter(e => e !== emp);
+      setEmployees(updated);
+      try {
+        await setDoc(doc(db, 'config', 'funcionarios'), { lista: updated });
+      } catch (e: any) {
+        console.error(e);
       }
     }
   };
@@ -658,6 +756,24 @@ export default function App() {
   const addNewFormRow = () => setForms(prev => [...prev, createEmptyForm()]);
   const removeForm = (id: string) => setForms(prev => prev.filter(f => f.id !== id));
 
+  if (!authInitialized) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-indigo-600">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <p className="font-bold text-slate-500">Carregando aplicação...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <>
+        <LandingPage onLogin={() => setShowAuth(true)} />
+        {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans print:bg-white print:text-black print:m-0 print-exact pb-24">
       {/* Navbar Print Hidden */}
@@ -679,42 +795,30 @@ export default function App() {
               <Printer size={16} /> <span className="hidden sm:inline">Imprimir</span>
             </button>
             
-            {user ? (
+            {user.email === 'joaopsfarma@gmail.com' && (
               <>
-                {user.email === 'joaopsfarma@gmail.com' && (
-                  <>
-                    <button 
-                      onClick={() => setShowSettings(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-xs sm:text-sm font-bold shadow-sm"
-                    >
-                      <Settings size={16} /> <span className="hidden sm:inline">Base </span>{csvData.length > 0 && `(${csvData.length})`}
-                    </button>
-                    <button 
-                      onClick={() => setShowValidationDashboard(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all text-xs sm:text-sm font-bold shadow-sm"
-                    >
-                      <Check size={16} /> <span className="hidden lg:inline">Validar Registros</span>
-                    </button>
-                  </>
-                )}
                 <button 
-                  onClick={logout}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all text-xs sm:text-sm font-bold shadow-sm border border-slate-200"
-                  title={user.email || ''}
+                  onClick={() => setShowSettings(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all text-xs sm:text-sm font-bold shadow-sm"
                 >
-                  <LogOut size={16} /> 
-                  <span className="hidden sm:inline">Sair</span>
+                  <Settings size={16} /> <span className="hidden sm:inline">Base </span>{csvData.length > 0 && `(${csvData.length})`}
+                </button>
+                <button 
+                  onClick={() => setShowValidationDashboard(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all text-xs sm:text-sm font-bold shadow-sm"
+                >
+                  <Check size={16} /> <span className="hidden lg:inline">Validar Registros</span>
                 </button>
               </>
-            ) : (
+            )}
             <button 
-              onClick={() => setShowAuth(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-all text-xs sm:text-sm font-bold shadow-sm"
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-all text-xs sm:text-sm font-bold shadow-sm border border-slate-200"
+              title={user.email || ''}
             >
-              <LogIn size={16} /> 
-              <span className="hidden sm:inline">Login</span>
+              <LogOut size={16} /> 
+              <span className="hidden sm:inline">Sair</span>
             </button>
-          )}
         </div>
       </nav>
 
@@ -894,7 +998,7 @@ export default function App() {
                         onChange={(e: any) => updateForm(form.id, 'data', e.target.value)}
                       />
                       <TextInput 
-                        label="Validade Após Fracionado" 
+                        label="Validade Após Fracionado (Opcional)" 
                         icon={Calendar} 
                         type="date"
                         value={form.dataValidadeAposFracionado}
@@ -913,7 +1017,7 @@ export default function App() {
                           list={`resp-${form.id}`}
                         />
                         <datalist id={`resp-${form.id}`}>
-                          {EMPLOYEES.map((name, idx) => (
+                          {employees.map((name, idx) => (
                             <option key={idx} value={name} />
                           ))}
                         </datalist>
@@ -927,7 +1031,7 @@ export default function App() {
                           list={`conferente-${form.id}`}
                         />
                         <datalist id={`conferente-${form.id}`}>
-                          {EMPLOYEES.map((name, idx) => (
+                          {employees.map((name, idx) => (
                             <option key={idx} value={name} />
                           ))}
                         </datalist>
@@ -1094,6 +1198,40 @@ export default function App() {
                   </button>
                 </div>
               )}
+
+              <div className="pt-6 border-t border-slate-100">
+                <h3 className="text-base font-black text-slate-800 mb-4">Profissionais (Resp. / Conferente)</h3>
+                
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newEmployee}
+                    onChange={(e) => setNewEmployee(e.target.value)}
+                    placeholder="Nome do profissional"
+                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none text-sm"
+                  />
+                  <button
+                    onClick={handleAddEmployee}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-sm"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {employees.map((emp, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                      <span className="text-sm font-semibold text-slate-700">{emp}</span>
+                      <button onClick={() => handleRemoveEmployee(emp)} className="text-slate-400 hover:text-red-500 transition-colors">
+                        <X size={14} strokeWidth={3} />
+                      </button>
+                    </div>
+                  ))}
+                  {employees.length === 0 && (
+                    <span className="text-sm text-slate-500 italic">Nenhum profissional cadastrado.</span>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
