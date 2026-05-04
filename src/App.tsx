@@ -30,6 +30,7 @@ interface FractionationRecord {
   status: string;
   validadoEm: any;
   validadoPor: string;
+  validationImageUrl?: string;
   createdAt: any;
   ownerId: string;
 }
@@ -51,6 +52,7 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const [loading, setLoading] = useState(true);
   const [validatingRecordId, setValidatingRecordId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<boolean[]>(new Array(VALIDATION_CHECKLIST.length).fill(false));
+  const [validationImage, setValidationImage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRecords = async () => {
@@ -75,6 +77,7 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const startValidation = (id: string) => {
     setValidatingRecordId(id);
     setChecklist(new Array(VALIDATION_CHECKLIST.length).fill(false));
+    setValidationImage(null);
   };
 
   const toggleChecklist = (index: number) => {
@@ -88,13 +91,16 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const handleValidate = async () => {
     if (!validatingRecordId) return;
     try {
-      await updateDoc(doc(db, 'fracionamentos', validatingRecordId), {
+      const updateData: any = {
         status: 'validado',
         validadoEm: serverTimestamp(),
         validadoPor: adminEmail,
         checklistPreenchido: true
-      });
-      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail } : r));
+      };
+      if (validationImage) updateData.validationImageUrl = validationImage;
+
+      await updateDoc(doc(db, 'fracionamentos', validatingRecordId), updateData);
+      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail, validationImageUrl: validationImage || undefined } : r));
       setValidatingRecordId(null);
     } catch (e) {
       console.error(e);
@@ -167,9 +173,69 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
                     )}
                   </div>
                 </div>
+
+                {record.status === 'validado' && record.validationImageUrl && (
+                  <div className="mt-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+                    <h4 className="font-bold text-emerald-900 mb-2 flex items-center gap-2 text-sm">
+                      <Camera size={16} /> Foto da Validação
+                    </h4>
+                    <div className="rounded-lg overflow-hidden border border-emerald-200 shadow-sm bg-slate-100 inline-block">
+                        <a href={record.validationImageUrl} target="_blank" rel="noopener noreferrer">
+                          <img src={record.validationImageUrl} alt="Foto da Validação" className="h-32 object-contain bg-white hover:opacity-90 transition-opacity" />
+                        </a>
+                    </div>
+                  </div>
+                )}
                 
                 {validatingRecordId === record.id && (
                   <div className="mt-4 p-5 bg-indigo-50 border border-indigo-100 rounded-xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-200">
+                    {record.imageUrl && (
+                      <div className="mb-4">
+                        <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                           <Camera size={18} /> Comprovante Visual do Fracionamento
+                        </h3>
+                        <div className="rounded-lg overflow-hidden border border-indigo-200 shadow-sm bg-slate-100">
+                           <a href={record.imageUrl} target="_blank" rel="noopener noreferrer">
+                             <img src={record.imageUrl} alt="Comprovante Visual" className="w-full max-h-96 object-contain bg-white hover:opacity-90 transition-opacity" />
+                           </a>
+                        </div>
+                        <p className="text-xs text-indigo-600 mt-2 font-medium">Clique na imagem para ampliar</p>
+                      </div>
+                    )}
+                    
+                    <div className="mb-4 pt-4 border-t border-indigo-100">
+                      <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                        <Camera size={18} /> Comprovante Fotográfico do Fracionamento
+                      </h3>
+                      {validationImage ? (
+                        <div className="relative rounded-lg overflow-hidden border border-indigo-200 shadow-sm bg-slate-100 mb-2">
+                          <img src={validationImage} alt="Comprovante Fotográfico" className="w-full max-h-96 object-contain bg-white" />
+                          <button 
+                            onClick={() => setValidationImage(null)}
+                            className="absolute top-2 right-2 bg-white/90 backdrop-blur p-1.5 rounded-full text-red-500 shadow-md hover:bg-white transition-colors"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-indigo-300 bg-indigo-50/50 rounded-xl cursor-pointer hover:bg-indigo-50 hover:border-indigo-400 transition-colors group">
+                          <div className="p-2 bg-white rounded-full shadow-sm mb-2 group-hover:scale-110 transition-transform text-slate-400 group-hover:text-indigo-500">
+                            <Camera size={24} />
+                          </div>
+                          <span className="text-sm font-semibold text-indigo-700">Tirar foto ou anexar comprovante</span>
+                          <span className="text-xs font-medium text-indigo-500 mt-1 text-center">Recomendado tirar no local após validação</span>
+                          <input type="file" className="hidden" accept="image/*" capture="environment" onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const reader = new FileReader();
+                              reader.onload = (e) => setValidationImage(e.target?.result as string);
+                              reader.readAsDataURL(file);
+                            }
+                          }} />
+                        </label>
+                      )}
+                    </div>
+
                     <h3 className="font-bold text-indigo-900 mb-3 flex items-center gap-2">
                        <Check size={18} /> Checklist de Validação
                     </h3>
@@ -848,7 +914,13 @@ export default function App() {
         </div>
         <div className="flex flex-wrap items-center justify-center w-full gap-2 md:w-auto md:justify-end">
             <button 
-              onClick={() => window.print()}
+              onClick={() => {
+                 if (window.self !== window.top) {
+                   alert("Para imprimir corretamente, por favor, clique no botão 'Opa!' / Abra em uma nova aba, no canto superior direito da tela de preview (ícone de seta com quadrado). A impressão é bloqueada quando acessada via iFrame.");
+                 } else {
+                   window.print();
+                 }
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 hover:border-slate-400 transition-all text-xs sm:text-sm font-bold shadow-sm"
             >
               <Printer size={16} /> <span className="hidden sm:inline">Imprimir</span>
