@@ -603,8 +603,10 @@ function LandingPage({ onLogin }: { onLogin: () => void }) {
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [csvData, setCsvData] = useState<MedicineRow[]>([]);
-  const [employees, setEmployees] = useState<string[]>(["Ana Beatriz", "Eloísa", "Gabriela"]);
+  const [employees, setEmployees] = useState<string[]>(["Ana Beatriz", "Eloísa", "Gabriela", "João"]);
   const [newEmployee, setNewEmployee] = useState('');
+  const [manufacturers, setManufacturers] = useState<string[]>(MANUFACTURERS);
+  const [newManufacturer, setNewManufacturer] = useState('');
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [authInitialized, setAuthInitialized] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
@@ -627,11 +629,11 @@ export default function App() {
       mppMav: false,
       materialDescartavel: false,
       termossensivel: false,
-      respFracionamento: '',
+      respFracionamento: 'João',
       quantidade: '',
-      conferente: '',
+      conferente: 'João',
       dataValidadeAposFracionado: '',
-      farmaceutico: '',
+      farmaceutico: 'João',
       imageUrl: ''
     };
   }
@@ -664,6 +666,10 @@ export default function App() {
         if (empSnap.exists() && empSnap.data().lista) {
           setEmployees(empSnap.data().lista);
         }
+        const mfgSnap = await getDoc(doc(db, 'config', 'fabricantes'));
+        if (mfgSnap.exists() && mfgSnap.data().lista) {
+          setManufacturers(mfgSnap.data().lista);
+        } // if not exists, we just rely on MANUFACTURERS default which is already the initial state
       } catch (e: any) {
         console.error("Error loading base from Firebase", e);
         if (e.message && e.message.includes('offline')) {
@@ -789,6 +795,30 @@ export default function App() {
       setEmployees(updated);
       try {
         await setDoc(doc(db, 'config', 'funcionarios'), { lista: updated });
+      } catch (e: any) {
+        console.error(e);
+      }
+    }
+  };
+
+  const handleAddManufacturer = async () => {
+    if (!newManufacturer.trim()) return;
+    const updated = [...manufacturers, newManufacturer.trim()].sort();
+    setManufacturers(updated);
+    setNewManufacturer('');
+    try {
+      await setDoc(doc(db, 'config', 'fabricantes'), { lista: updated });
+    } catch (e: any) {
+      console.error(e);
+    }
+  };
+
+  const handleRemoveManufacturer = async (mfg: string) => {
+    if(confirm(`Remover ${mfg}?`)) {
+      const updated = manufacturers.filter(m => m !== mfg);
+      setManufacturers(updated);
+      try {
+        await setDoc(doc(db, 'config', 'fabricantes'), { lista: updated });
       } catch (e: any) {
         console.error(e);
       }
@@ -1063,7 +1093,7 @@ export default function App() {
                       placeholder="Nome do laboratório"
                     />
                     <datalist id={`fabricantes-${form.id}`}>
-                      {MANUFACTURERS.map((fabricante, idx) => (
+                      {manufacturers.map((fabricante, idx) => (
                         <option key={idx} value={fabricante} />
                       ))}
                     </datalist>
@@ -1367,6 +1397,40 @@ export default function App() {
                   ))}
                   {employees.length === 0 && (
                     <span className="text-sm text-slate-500 italic">Nenhum profissional cadastrado.</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t border-slate-100">
+                <h3 className="text-base font-black text-slate-800 mb-4">Fabricantes</h3>
+                
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    value={newManufacturer}
+                    onChange={(e) => setNewManufacturer(e.target.value)}
+                    placeholder="Nome do laboratório"
+                    className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all outline-none text-sm"
+                  />
+                  <button
+                    onClick={handleAddManufacturer}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-sm"
+                  >
+                    Adicionar
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-1">
+                  {manufacturers.map((mfg, idx) => (
+                    <div key={idx} className="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                      <span className="text-sm w-24 truncate font-semibold text-slate-700" title={mfg}>{mfg}</span>
+                      <button onClick={() => handleRemoveManufacturer(mfg)} className="text-slate-400 hover:text-red-500 transition-colors">
+                        <X size={14} strokeWidth={3} />
+                      </button>
+                    </div>
+                  ))}
+                  {manufacturers.length === 0 && (
+                    <span className="text-sm text-slate-500 italic">Nenhum fabricante cadastrado.</span>
                   )}
                 </div>
               </div>
