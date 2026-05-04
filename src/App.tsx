@@ -603,7 +603,7 @@ function LandingPage({ onLogin }: { onLogin: () => void }) {
 export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [csvData, setCsvData] = useState<MedicineRow[]>([]);
-  const [employees, setEmployees] = useState<string[]>(["Ana Beatriz", "Eloísa", "Gabriela", "João"]);
+  const [employees, setEmployees] = useState<string[]>(["Ana Beatriz", "Eloísa", "Gabriela"]);
   const [newEmployee, setNewEmployee] = useState('');
   const [manufacturers, setManufacturers] = useState<string[]>(MANUFACTURERS);
   const [newManufacturer, setNewManufacturer] = useState('');
@@ -629,9 +629,9 @@ export default function App() {
       mppMav: false,
       materialDescartavel: false,
       termossensivel: false,
-      respFracionamento: 'João',
+      respFracionamento: '',
       quantidade: '',
-      conferente: 'João',
+      conferente: '',
       dataValidadeAposFracionado: '',
       farmaceutico: 'João',
       imageUrl: ''
