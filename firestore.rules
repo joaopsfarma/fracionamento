@@ -23,7 +23,7 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.token.email == 'joaopsfarma@gmail.com';
+      return isSignedIn() && request.auth.token.get('email', '') == 'joaopsfarma@gmail.com';
     }
 
     function isValidFractionationRecord(data) {
@@ -47,7 +47,8 @@ service cloud.firestore {
              (data.get('farmaceutico', '') is string) &&
              (data.get('imageUrl', '') is string) &&
              (data.get('status', 'pendente') is string) &&
-             (data.get('validadoPor', '') is string);
+             (data.get('validadoPor', '') is string) &&
+             (data.get('validadoEm', '') is string);
     }
 
     match /config/{configId} {

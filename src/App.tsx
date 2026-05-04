@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 
 interface FractionationRecord {
   id: string;
