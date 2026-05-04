@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'joaopsfarma@gmail.com';
+    }
+
+    function isValidFractionationRecord(data) {
+      return data.keys().hasAll(['identificacao', 'quantidade', 'ownerId']) &&
+             data.ownerId == request.auth.uid &&
+             data.identificacao is string &&
+             data.quantidade is string &&
+             data.ownerId is string &&
+             (data.get('lote', '') is string) &&
+             (data.get('fabricante', '') is string) &&
+             (data.get('dataValidadeFabricante', '') is string) &&
+             (data.get('data', '') is string) &&
+             (data.get('destino', '') is string) &&
+             (data.get('psicotropico', false) is bool) &&
+             (data.get('mppMav', false) is bool) &&
+             (data.get('materialDescartavel', false) is bool) &&
+             (data.get('termossensivel', false) is bool) &&
+             (data.get('respFracionamento', '') is string) &&
+             (data.get('conferente', '') is string) &&
+             (data.get('dataValidadeAposFracionado', '') is string) &&
+             (data.get('farmaceutico', '') is string) &&
+             (data.get('imageUrl', '') is string) &&
+             (data.get('status', 'pendente') is string) &&
+             (data.get('validadoPor', '') is string);
+    }
+
+    match /fracionamentos/{recordId} {
+      allow list: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.ownerId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && 
+                    isValidId(recordId) && 
+                    isValidFractionationRecord(incoming()) && 
+                    incoming().createdAt == request.time;
+      
+      allow update: if isSignedIn() &&
+                    (isAdmin() || (
+                      isValidFractionationRecord(incoming()) &&
+                      incoming().ownerId == existing().ownerId &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['identificacao', 'lote', 'fabricante', 'dataValidadeFabricante', 'data', 'destino', 'psicotropico', 'mppMav', 'materialDescartavel', 'termossensivel', 'respFracionamento', 'quantidade', 'conferente', 'dataValidadeAposFracionado', 'farmaceutico', 'imageUrl'])
+                    ));
+
+      allow delete: if isSignedIn() && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "FractionationRecord": {
+      "title": "Registro de Fracionamento",
+      "description": "A record of medicine fractionation",
+      "type": "object",
+      "properties": {
+        "identificacao": { "type": "string" },
+        "lote": { "type": "string" },
+        "fabricante": { "type": "string" },
+        "dataValidadeFabricante": { "type": "string" },
+        "data": { "type": "string" },
+        "destino": { "type": "string" },
+        "psicotropico": { "type": "boolean" },
+        "mppMav": { "type": "boolean" },
+        "materialDescartavel": { "type": "boolean" },
+        "termossensivel": { "type": "boolean" },
+        "respFracionamento": { "type": "string" },
+        "quantidade": { "type": "string" },
+        "conferente": { "type": "string" },
+        "dataValidadeAposFracionado": { "type": "string" },
+        "farmaceutico": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "validado", "recusado"] },
+        "validadoEm": { "type": "timestamp" },
+        "validadoPor": { "type": "string" },
+        "createdAt": { "type": "timestamp" },
+        "ownerId": { "type": "string" }
+      },
+      "required": [
+        "identificacao",
+        "quantidade",
+        "ownerId"
+      ]
+    }
+  },
+  "firestore": {
+    "fracionamentos": {
+      "schema": { "$ref": "#/entities/FractionationRecord" },
+      "description": "Records of medication fractionations"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .print-exact {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+  body, html {
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Modern styling for print cards */
+  .print-card {
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 12px !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 24px !important;
+    box-shadow: none !important;
+  }
+}
