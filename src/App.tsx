@@ -6,7 +6,7 @@ import {
   User, Beaker, ThermometerSnowflake, FileSignature, Box, Tag, Package, Camera, CloudUpload, LogIn, LogOut
 } from 'lucide-react';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 
 interface FractionationRecord {
@@ -342,6 +342,20 @@ function AuthModal({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleAnonymousLogin = async () => {
+    setError('');
+    setLoading(true);
+    
+    try {
+      await signInAnonymously(auth);
+      onClose();
+    } catch (err: any) {
+      setError(err.message || 'Erro ao entrar como anônimo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 print:hidden animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col border border-slate-200">
@@ -425,6 +439,21 @@ function AuthModal({ onClose }: { onClose: () => void }) {
               <path d="M1 1h22v22H1z" fill="none"/>
             </svg>
             Entrar com o Google
+          </button>
+
+          <div className="relative flex items-center py-4">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-bold uppercase tracking-wider">ou</span>
+            <div className="flex-grow border-t border-slate-200"></div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleAnonymousLogin} 
+            disabled={loading}
+            className="w-full flex items-center justify-center py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            Entrar como Visitante (Anônimo)
           </button>
         </div>
       </div>
@@ -846,9 +875,9 @@ export default function App() {
             .filter(d => d.Identificacao === form.identificacao && d.Lote)
             .map(d => d.Lote)));
 
-          const filteredMeds = form.identificacao 
+          const filteredMeds = (form.identificacao && form.identificacao.length >= 3)
             ? uniqueMedications.filter(m => m.toLowerCase().includes(form.identificacao.toLowerCase())).slice(0, 100)
-            : uniqueMedications.slice(0, 100);
+            : [];
 
           return (
             <div key={form.id} className="relative bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 transition-all print:p-6 print:print-card">
@@ -879,7 +908,7 @@ export default function App() {
                       value={form.identificacao}
                       onChange={(e: any) => updateForm(form.id, 'identificacao', e.target.value)}
                       list={`meds-${form.id}`}
-                      placeholder="Selecione ou digite o nome completo"
+                      placeholder="Digite pelo menos 3 letras para buscar..."
                     />
                     <datalist id={`meds-${form.id}`}>
                       {filteredMeds.map((med, idx) => (
