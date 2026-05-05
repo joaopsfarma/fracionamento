@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Papa from 'papaparse';
 import { 
-  Settings, FileUp, Check, Plus, Trash2, Printer, X, 
+  Settings, FileUp, Check, Plus, Trash2, Printer, X, Download, ChevronDown, ChevronUp,
   Pill, Hash, Factory, Calendar, ShieldAlert, ArrowRightLeft, 
   User, Beaker, ThermometerSnowflake, FileSignature, Box, Tag, Package, Camera, CloudUpload, LogIn, LogOut, AlertCircle
 } from 'lucide-react';
@@ -51,8 +51,36 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const [records, setRecords] = useState<FractionationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [validatingRecordId, setValidatingRecordId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<boolean[]>(new Array(VALIDATION_CHECKLIST.length).fill(false));
   const [validationImage, setValidationImage] = useState<string | null>(null);
+
+  const exportToCSV = () => {
+    if (records.length === 0) return;
+    const dataToExport = records.map(r => ({
+      'Identificação': r.identificacao,
+      'Quantidade': r.quantidade,
+      'Lote': r.lote,
+      'Fabricante': r.fabricante,
+      'Resp. Fracionamento': r.respFracionamento,
+      'Conferente': r.conferente,
+      'Farmacêutico': r.farmaceutico,
+      'Validade Após Fracionado': r.dataValidadeAposFracionado,
+      'Status': r.status,
+      'Data do Registro': r.createdAt ? new Date(r.createdAt.toMillis()).toLocaleString('pt-BR') : '',
+      'Validado Por': r.validadoPor || '',
+      'Validado Em': r.validadoEm ? new Date(r.validadoEm.toMillis()).toLocaleString('pt-BR') : ''
+    }));
+    const csvStr = Papa.unparse(dataToExport, { delimiter: ';' });
+    
+    const blob = new Blob(["\uFEFF" + csvStr], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `fracionamentos_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -129,9 +157,14 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
             <Check size={22} className="text-amber-500" />
             Validação de Fracionamentos
           </h2>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-200 rounded-full transition-all">
-            <X size={20} strokeWidth={2.5} />
-          </button>
+          <div className="flex items-center gap-3">
+             <button onClick={exportToCSV} className="flex items-center gap-2 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-sm font-bold rounded-xl shadow-sm transition-all border border-emerald-200">
+               <Download size={16} /> <span className="hidden sm:inline">Exportar Excel</span>
+             </button>
+             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-800 hover:bg-slate-200 rounded-full transition-all">
+               <X size={20} strokeWidth={2.5} />
+             </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
           {loading ? (
@@ -170,8 +203,51 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
                     {record.status === 'recusado' && (
                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold uppercase tracking-wide">Recusado</span>
                     )}
+                    
+                    <button 
+                      onClick={() => setExpandedId(expandedId === record.id ? null : record.id)}
+                      className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors border border-transparent hover:border-slate-200"
+                      title="Ver mais detalhes"
+                    >
+                      {expandedId === record.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </button>
                   </div>
                 </div>
+
+                {expandedId === record.id && (
+                  <div className="mx-4 p-4 mb-2 bg-slate-50 border-x border-b border-slate-200 rounded-b-xl shadow-inner -mt-4 pt-6 animate-in fade-in slide-in-from-top-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-sm font-medium text-slate-600">
+                      <div>
+                        <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Fabricante</span>
+                        {record.fabricante || '-'}
+                      </div>
+                      <div>
+                        <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Resp. Fracionamento</span>
+                        {record.respFracionamento || '-'}
+                      </div>
+                      <div>
+                        <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Conferente</span>
+                        {record.conferente || '-'}
+                      </div>
+                      <div>
+                        <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Validade (Após Frac.)</span>
+                        {record.dataValidadeAposFracionado || '-'}
+                      </div>
+                      <div>
+                        <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Data de Registro</span>
+                        {record.createdAt ? new Date(record.createdAt.toMillis()).toLocaleString('pt-BR') : '-'}
+                      </div>
+                      {record.status !== 'pendente' && (
+                        <div>
+                          <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Status Atualizado Em</span>
+                          <span className={`${record.status === 'validado' ? 'text-green-700' : 'text-red-700'}`}>
+                             {record.validadoEm ? new Date(record.validadoEm.toMillis()).toLocaleString('pt-BR') : '-'} por {record.validadoPor}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {record.status === 'validado' && record.validationImageUrl && (
                   <div className="mt-3 p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
