@@ -31,6 +31,8 @@ interface FractionationRecord {
   validadoEm: any;
   validadoPor: string;
   validationImageUrl?: string;
+  isConforme?: boolean;
+  checklistEstado?: boolean[];
   createdAt: any;
   ownerId: string;
 }
@@ -67,6 +69,7 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
       'Farmacêutico': r.farmaceutico,
       'Validade Após Fracionado': r.dataValidadeAposFracionado,
       'Status': r.status,
+      'Conformidade': r.status === 'validado' ? (r.isConforme === false ? 'Não Conforme' : 'Conforme') : '-',
       'Data do Registro': r.createdAt ? new Date(r.createdAt.toMillis()).toLocaleString('pt-BR') : '',
       'Validado Por': r.validadoPor || '',
       'Validado Em': r.validadoEm ? new Date(r.validadoEm.toMillis()).toLocaleString('pt-BR') : ''
@@ -118,16 +121,18 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const handleValidate = async () => {
     if (!validatingRecordId) return;
     try {
+      const isConforme = checklist.every(Boolean);
       const updateData: any = {
         status: 'validado',
         validadoEm: serverTimestamp(),
         validadoPor: adminEmail,
-        checklistPreenchido: true
+        isConforme: isConforme,
+        checklistEstado: checklist
       };
       if (validationImage) updateData.validationImageUrl = validationImage;
 
       await updateDoc(doc(db, 'fracionamentos', validatingRecordId), updateData);
-      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail, validationImageUrl: validationImage || undefined } : r));
+      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail, validationImageUrl: validationImage || undefined, isConforme } : r));
       setValidatingRecordId(null);
     } catch (e) {
       console.error(e);
@@ -238,12 +243,22 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
                         {record.createdAt ? new Date(record.createdAt.toMillis()).toLocaleString('pt-BR') : '-'}
                       </div>
                       {record.status !== 'pendente' && (
-                        <div>
-                          <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Status Atualizado Em</span>
-                          <span className={`${record.status === 'validado' ? 'text-green-700' : 'text-red-700'}`}>
-                             {record.validadoEm ? new Date(record.validadoEm.toMillis()).toLocaleString('pt-BR') : '-'} por {record.validadoPor}
-                          </span>
-                        </div>
+                        <>
+                          <div>
+                            <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Status Atualizado Em</span>
+                            <span className={`${record.status === 'validado' ? 'text-green-700' : 'text-red-700'}`}>
+                               {record.validadoEm ? new Date(record.validadoEm.toMillis()).toLocaleString('pt-BR') : '-'} por {record.validadoPor}
+                            </span>
+                          </div>
+                          {record.status === 'validado' && (
+                            <div>
+                              <span className="block text-xs uppercase text-slate-400 font-bold mb-0.5">Conformidade</span>
+                              <span className={`${record.isConforme === false ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}`}>
+                                 {record.isConforme === false ? 'Não Conforme' : 'Conforme'}
+                              </span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -336,7 +351,6 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
                       </button>
                       <button 
                         onClick={handleValidate}
-                        disabled={!checklist.every(Boolean)}
                         className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white text-sm font-bold rounded-lg shadow-md transition-all"
                       >
                         Confirmar Validação

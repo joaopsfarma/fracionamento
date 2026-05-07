@@ -48,7 +48,11 @@ service cloud.firestore {
              (data.get('imageUrl', '') is string) &&
              (data.get('status', 'pendente') is string) &&
              (data.get('validadoPor', '') is string) &&
-             (data.get('validadoEm', '') is string);
+             (data.get('validadoEm', '') is string) &&
+             (data.get('validationImageUrl', '') is string) &&
+             (data.get('isConforme', true) is bool) &&
+             (data.get('checklistEstado', []) is list) &&
+             (data.get('checklistPreenchido', false) is bool);
     }
 
     match /config/{configId} {
