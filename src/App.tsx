@@ -5,10 +5,9 @@ import {
   Pill, Hash, Factory, Calendar, ShieldAlert, ArrowRightLeft, 
   User, Beaker, ThermometerSnowflake, FileSignature, Box, Tag, Package, Camera, CloudUpload, LogIn, LogOut, AlertCircle
 } from 'lucide-react';
-import { auth, db, storage, handleFirestoreError, OperationType } from './firebase';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 const compressImage = (file: File, callback: (compressedDataUrl: string) => void) => {
   const reader = new FileReader();
@@ -18,7 +17,7 @@ const compressImage = (file: File, callback: (compressedDataUrl: string) => void
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      const MAX_DIMENSION = 1000;
+      const MAX_DIMENSION = 800;
       
       if (width > height) {
         if (width > MAX_DIMENSION) {
@@ -36,7 +35,7 @@ const compressImage = (file: File, callback: (compressedDataUrl: string) => void
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(img, 0, 0, width, height);
-      callback(canvas.toDataURL('image/jpeg', 0.6));
+      callback(canvas.toDataURL('image/jpeg', 0.5));
     };
     img.src = e.target?.result as string;
   };
@@ -155,19 +154,6 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
   const handleValidate = async () => {
     if (!validatingRecordId) return;
     try {
-      let finalValidationImageUrl = validationImage;
-      
-      if (finalValidationImageUrl && finalValidationImageUrl.startsWith('data:image')) {
-        try {
-           const imageRef = ref(storage, `validacoes/${validatingRecordId}_${Date.now()}.jpg`);
-           await uploadString(imageRef, finalValidationImageUrl, 'data_url');
-           finalValidationImageUrl = await getDownloadURL(imageRef);
-        } catch (storageErr) {
-           console.error("Validation image upload to storage failed", storageErr);
-           alert("Falha ao salvar a imagem no Storage (verifique as regras do Firebase).");
-        }
-      }
-
       const isConforme = checklist.every(Boolean);
       const updateData: any = {
         status: 'validado',
@@ -176,10 +162,10 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
         isConforme: isConforme,
         checklistEstado: checklist
       };
-      if (finalValidationImageUrl) updateData.validationImageUrl = finalValidationImageUrl;
+      if (validationImage) updateData.validationImageUrl = validationImage;
 
       await updateDoc(doc(db, 'fracionamentos', validatingRecordId), updateData);
-      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail, validationImageUrl: finalValidationImageUrl || undefined, isConforme } : r));
+      setRecords(prev => prev.map(r => r.id === validatingRecordId ? { ...r, status: 'validado', validadoPor: adminEmail, validationImageUrl: validationImage || undefined, isConforme } : r));
       setValidatingRecordId(null);
     } catch (e) {
       console.error(e);
@@ -966,50 +952,6 @@ export default function App() {
     }
   };
 
-  const handleMigrateImages = async () => {
-    if (!confirm('Deseja migrar as imagens antigas para o Storage? (Isso pode demorar alguns minutos e só deve ser feito por um administrador).')) return;
-    try {
-      alert("Iniciando migração... Por favor, aguarde o alerta de conclusão.");
-      const snap = await getDocs(collection(db, 'fracionamentos'));
-      let migrated = 0;
-      
-      for (const docSnap of snap.docs) {
-        const data = docSnap.data();
-        const updates: any = {};
-        
-        if (data.imageUrl && data.imageUrl.startsWith('data:image')) {
-          try {
-             const imageRef = ref(storage, `fracionamentos/${docSnap.id}_migrated_${Date.now()}.jpg`);
-             await uploadString(imageRef, data.imageUrl, 'data_url');
-             updates.imageUrl = await getDownloadURL(imageRef);
-          } catch (e) {
-             console.error("Migration err for imageUrl", docSnap.id, e);
-          }
-        }
-        
-        if (data.validationImageUrl && data.validationImageUrl.startsWith('data:image')) {
-          try {
-             const imageRef = ref(storage, `validacoes/${docSnap.id}_migrated_${Date.now()}.jpg`);
-             await uploadString(imageRef, data.validationImageUrl, 'data_url');
-             updates.validationImageUrl = await getDownloadURL(imageRef);
-          } catch (e) {
-             console.error("Migration err for validationImageUrl", docSnap.id, e);
-          }
-        }
-        
-        if (Object.keys(updates).length > 0) {
-          await updateDoc(doc(db, 'fracionamentos', docSnap.id), updates);
-          migrated++;
-        }
-      }
-      
-      alert(`Migração concluída! ${migrated} registros atualizados.`);
-    } catch(e) {
-      console.error(e);
-      alert('Erro na migração.');
-    }
-  };
-
   const uniqueMedications = useMemo(() => {
     const unique = new Set(csvData.map(d => d.Identificacao).filter(Boolean));
     return Array.from(unique).sort();
@@ -1058,21 +1000,6 @@ export default function App() {
       for (const form of forms) {
         if (!form.identificacao || !form.quantidade) continue; // Skip empty
         
-        let finalImageUrl = form.imageUrl || '';
-        
-        if (finalImageUrl.startsWith('data:image')) {
-          try {
-             // Upload compressed base64 to Firebase Storage
-             const imageRef = ref(storage, `fracionamentos/${form.id}_${Date.now()}.jpg`);
-             await uploadString(imageRef, finalImageUrl, 'data_url');
-             finalImageUrl = await getDownloadURL(imageRef);
-          } catch (storageErr) {
-             console.error("Image upload to storage failed", storageErr);
-             alert("Falha ao salvar a imagem no Storage (verifique as regras do Firebase). Salvando sem imagem temporariamente ou usando base64...");
-             // You can choose to leave it as base64 or remove it. Let's leave it as base64 as fallback, though it might fail Firestore limits.
-          }
-        }
-        
         await setDoc(doc(db, 'fracionamentos', form.id), {
            identificacao: form.identificacao || '',
            lote: form.lote || '',
@@ -1089,7 +1016,7 @@ export default function App() {
            conferente: form.conferente || '',
            dataValidadeAposFracionado: form.dataValidadeAposFracionado || '',
            farmaceutico: form.farmaceutico || '',
-           imageUrl: finalImageUrl,
+           imageUrl: form.imageUrl || '',
            ownerId: user.uid,
            createdAt: serverTimestamp(),
            status: 'pendente',
@@ -1564,19 +1491,6 @@ export default function App() {
                   </button>
                 </div>
               )}
-
-              <div className="pt-6 border-t border-slate-100">
-                <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 flex flex-col gap-3">
-                  <h3 className="text-base font-black text-amber-900">Migração de Imagens</h3>
-                  <p className="text-sm text-amber-800">Cuidado: Mova as imagens salvas no banco de dados para o Storage. Esta ação só deve ser feita se houver fotos em base64 bloqueando o sistema.</p>
-                  <button 
-                    onClick={handleMigrateImages}
-                    className="text-xs self-start text-amber-700 bg-amber-100 hover:bg-amber-200 px-4 py-2 rounded-xl transition-all font-bold shadow-sm"
-                  >
-                    Iniciar Migração
-                  </button>
-                </div>
-              </div>
 
               <div className="pt-6 border-t border-slate-100">
                 <h3 className="text-base font-black text-slate-800 mb-4">Profissionais (Resp. / Conferente)</h3>
