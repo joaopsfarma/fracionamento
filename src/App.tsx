@@ -9,6 +9,39 @@ import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInAnonymously, onAuthStateChanged, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, updateDoc, collection, getDocs, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 
+const compressImage = (file: File, callback: (compressedDataUrl: string) => void) => {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+      const MAX_DIMENSION = 1000;
+      
+      if (width > height) {
+        if (width > MAX_DIMENSION) {
+          height *= MAX_DIMENSION / width;
+          width = MAX_DIMENSION;
+        }
+      } else {
+        if (height > MAX_DIMENSION) {
+          width *= MAX_DIMENSION / height;
+          height = MAX_DIMENSION;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      callback(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = e.target?.result as string;
+  };
+  reader.readAsDataURL(file);
+};
+
 interface FractionationRecord {
   id: string;
   identificacao: string;
@@ -317,9 +350,9 @@ function ValidationDashboard({ onClose, adminEmail }: { onClose: () => void, adm
                           <input type="file" className="hidden" accept="image/*" capture="environment" onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (e) => setValidationImage(e.target?.result as string);
-                              reader.readAsDataURL(file);
+                              compressImage(file, (compressedDataUrl) => {
+                                setValidationImage(compressedDataUrl);
+                              });
                             }
                           }} />
                         </label>
@@ -1355,11 +1388,9 @@ export default function App() {
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onload = (e) => {
-                                updateForm(form.id, 'imageUrl', e.target?.result);
-                              };
-                              reader.readAsDataURL(file);
+                              compressImage(file, (compressedDataUrl) => {
+                                updateForm(form.id, 'imageUrl', compressedDataUrl);
+                              });
                             }
                           }}
                         />
